@@ -36,6 +36,7 @@ class Acceptor(threading.Thread):
 
     def InitChannel( self ):
         channel = self.__conn.channel()
+        channel.queue_delete(queue=self.__acceptor_id)
         channel.queue_declare(queue=self.__acceptor_id)
         channel.basic_qos(prefetch_count=1)
 
@@ -109,3 +110,6 @@ class Acceptor(threading.Thread):
     """ Flow control """
     def run( self ):
         self.__channel.start_consuming()
+
+    def del_queue( self ):
+        self.__channel.queue_delete(queue=self.__acceptor_id)
