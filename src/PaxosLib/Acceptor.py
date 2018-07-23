@@ -82,6 +82,7 @@ class Acceptor(threading.Thread):
             'Promise',
             self.__acceptor_id,
             task_id,
+            tx_id,
             value
         ])
 
@@ -98,6 +99,7 @@ class Acceptor(threading.Thread):
             'Accepted',
             self.__acceptor_id,
             task_id,
+            tx_id,
             value
         ])
 
