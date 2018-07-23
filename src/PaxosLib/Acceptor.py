@@ -50,6 +50,8 @@ class Acceptor(threading.Thread):
                 resp = self.handle_prepare(*req[1:])
             elif req[0] == 'Accept':
                 resp = self.handle_accept(*req[1:])
+            else:
+                resp = None
 
             # Send response
             if resp != None:
