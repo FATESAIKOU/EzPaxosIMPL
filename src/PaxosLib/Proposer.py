@@ -55,12 +55,12 @@ class Proposer():
                 continue
 
             """ Accept """
-            (accept_msg, status) = self.Accept(
+            accepted_msg = self.Accept(
                     promised_ids, task_id, tx_id,
                     MostCommonOrDefault(
                         values, len(server_ids/2, value), value))
 
-            if status == 'ACCEPTED':
+            if len(accepted_msg) > len(server_ids)/2:
                 break
 
     """ Sub function for prepare and accept """
@@ -93,9 +93,32 @@ class Proposer():
         return list(resps.keys()), list(resps.values())
 
     def Accept( self, server_ids, task_id, tx_id, value ):
-        """
-        do promise
-        """
+        """ Initalize consume callback """
+        resps = {}
+        def consume_callback(channel, method, properties, body):
+            nonlocal self, resps, server_ids, task_id
+            resp = json.loads(body)
+
+            if resp[0] == 'Accepted' and \
+                    resp[1] not in resps.keys() and \
+                    resp[2] == task_id:
+                resps[resp[1]] = resp[3:]
+
+            if len(resps) == len(server_ids):
+                channel.stop_consuming()
+
+            channel.basic_ack(delivery_tag=method.delivery_tag)
+
+        """ Send message """
+        self.SendMsg(
+            server_ids,
+            json.dumps(['Accept', self.__client_id, task_id, tx_id, value]),
+            consume_callback,
+            10.0,
+            lambda: self.__channel.stop_consuming()
+        )
+
+        return list(resps.values())
 
     """ Utils """
     def DoConsuming( self, consume_callback ):
@@ -103,18 +126,15 @@ class Proposer():
 
     def SendMsg( self, server_ids, message, consume_callback, timeout, timeout_callback ):
         """ Recreate consumer """
-        print("1")
         self.__channel.basic_cancel(consumer_tag='prepare')
         self.__channel.basic_consume(consume_callback,
                 queue=self.__client_id, consumer_tag='prepare')
 
-        print("2")
         """ Regist Timer & Consumer Thread """
         self.__timer = Timer(timeout, timeout_callback)
         t = Thread(target=self.__channel.start_consuming)
 
         """ Send message """
-        print("3")
         self.__timer.start()
         t.start()
 
@@ -125,6 +145,4 @@ class Proposer():
 
         t.join()
 
-        print("4")
         self.__timer.cancel()
-
