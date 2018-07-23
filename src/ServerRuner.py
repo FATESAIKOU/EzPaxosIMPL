@@ -34,7 +34,7 @@ def main():
     except KeyboardInterrupt:
         print("Start Deleting Queue")
         for a in acceptors:
-            a.del_queue()
+            a.stop()
 
     print("End Server")
     os.kill(os.getpid(), signal.SIGTERM)
