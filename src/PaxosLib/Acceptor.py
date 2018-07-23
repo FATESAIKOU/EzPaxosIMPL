@@ -114,4 +114,5 @@ class Acceptor(threading.Thread):
         self.__channel.start_consuming()
 
     def del_queue( self ):
+        self.__channel.stop_consuming()
         self.__channel.queue_delete(queue=self.__acceptor_id)
