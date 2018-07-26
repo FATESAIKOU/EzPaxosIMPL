@@ -16,7 +16,7 @@ def MostCommonOrDefault( L, gap, default_value ):
     counts = [(value, len(list(iterable)))
         for value, iterable in groups]
 
-    max_ele = max(counts, key=lambda x: x[1])
+    max_ele = max(counts or [(0, 0)], key=lambda x: x[1])
 
     return max_ele[0] if max_ele[1] > gap else default_value
 
@@ -29,6 +29,12 @@ class Proposer():
         self.__channel = self.InitChannel()
 
     """ Connection Toolkits """
+    def GetInfo( self ):
+        return {
+            'host': self.__host,
+            'client_id': self.__client_id
+        }
+
     def ConnHost( self ):
         return pika.BlockingConnection(
                 pika.ConnectionParameters(host=self.__host))
@@ -45,23 +51,27 @@ class Proposer():
         self.__channel.queue_delete(queue=self.__client_id)
 
     """ Main function """
-    def PushIssue( self, server_ids, task_id, value, max_retry=10 ):
+    def PushIssue( self, server_ids, task_id, value, max_retry=3 ):
+        pushed = False
         for tx_id in range(1, max_retry + 1):
             """ Promise """
             (promised_ids, values) = self.Prepare(
                     server_ids, task_id, tx_id)
 
-            if len(promised_ids) > len(server_ids) / 2:
+            if len(promised_ids) < len(server_ids) / 2:
                 continue
 
             """ Accept """
             accepted_msg = self.Accept(
                     promised_ids, task_id, tx_id,
                     MostCommonOrDefault(
-                        values, len(server_ids/2, value), value))
+                        values, len(server_ids)/2, value))
 
             if len(accepted_msg) > len(server_ids)/2:
+                pushed = True
                 break
+
+        return pushed
 
     """ Sub function for prepare and accept """
     def Prepare( self, server_ids, task_id, tx_id ):
@@ -86,7 +96,7 @@ class Proposer():
             server_ids,
             json.dumps(['Prepare', self.__client_id, task_id, tx_id]),
             consume_callback,
-            10.0,
+            1.0,
             lambda: self.__channel.stop_consuming()
         )
 
@@ -139,7 +149,6 @@ class Proposer():
         t.start()
 
         for i in server_ids:
-            print("send: " + str(i))
             self.__channel.basic_publish(exchange='',
                     routing_key=('acceptor_' + str(i)), body=message)
 
